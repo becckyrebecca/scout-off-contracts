@@ -418,8 +418,12 @@ impl ProgressContract {
     }
 
     /// Return all history entries for a player in chronological order (index 1..=N).
-    /// Reads a single persistent storage key (`HistoryVec`) regardless of entry count,
-    /// reducing gas cost from O(N) individual reads to O(1).
+    ///
+    /// History is stored in a single `HistoryVec` key that is appended on every
+    /// `advance_level` call. This function reads that key once, so the number of
+    /// storage reads is O(1) with respect to entry count (the full Vec is
+    /// deserialised in one read, then filtered in memory).
+    ///
     /// Returns an empty Vec if the player has no history.
     pub fn get_progress_history(env: Env, player_id: u64) -> Vec<ProgressEntry> {
         let vec_key = DataKey::HistoryVec(player_id);
@@ -562,7 +566,10 @@ impl ProgressContract {
 
     /// Query history entries for a player since a given Unix timestamp.
     /// Returns all entries where `updated_at >= since_timestamp`.
-    /// Uses the HistoryVec for O(1) lookup, filters in-memory.
+    ///
+    /// History is stored in the `HistoryVec` shard and loaded in a single read.
+    /// The full Vec is deserialised in-memory and then filtered — this is O(1)
+    /// storage reads regardless of entry count, with a linear in-memory scan.
     pub fn get_history_since(env: Env, player_id: u64, since_timestamp: u64) -> Vec<ProgressEntry> {
         let vec_key = DataKey::HistoryVec(player_id);
         let history: Vec<ProgressEntry> = env
